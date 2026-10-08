@@ -99,6 +99,18 @@ class RegistrationApprovalTest extends TestCase
         $this->assertAuthenticatedAs($student->fresh());
     }
 
+    public function test_make_admin_command_promotes_a_registered_account(): void
+    {
+        $user = User::factory()->pending()->create(['email' => 'owner@example.com']);
+
+        $this->artisan('crm:make-admin', ['email' => 'owner@example.com'])->assertSuccessful();
+        $this->artisan('crm:make-admin', ['email' => 'nobody@example.com'])->assertFailed();
+
+        $user->refresh();
+        $this->assertTrue($user->isSuperAdmin());
+        $this->assertTrue($user->isApproved());
+    }
+
     public function test_panel_access_is_role_and_status_based(): void
     {
         $student = User::factory()->create();
