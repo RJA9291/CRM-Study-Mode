@@ -1,58 +1,59 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CRM Study Mode
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+CRM untuk pelajar: dashboard Profile, Task, To-do, ID & Password Locker, prestasi task, Chat Assistant (web + Telegram) dan Knowledge berasaskan folder Google Drive yang dijawab oleh Claude. Super Admin meluluskan pendaftaran pelajar baru.
 
-## About Laravel
+Laravel 13 · Filament 5 · PHP 8.3 · MySQL (production) / SQLite (local)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Panel
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| URL | Siapa | Isi |
+|---|---|---|
+| `/app` | Pelajar yang diluluskan | Dashboard prestasi, Task, To-do List, ID & Password Locker, Chat Assistant, Profil. Pendaftaran di `/app/register`. |
+| `/admin` | Super Admin | Pelajar & Pengguna (lulus/tolak), Task Pelajar (beri task kepada seorang atau ramai), Knowledge (Google Drive), Log Chat. |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Pelajar baru berdaftar sebagai **Menunggu**; mereka tidak boleh log masuk sehingga Super Admin meluluskan.
+- **Locker**: password & nota disulitkan dengan `APP_KEY` (cast `encrypted`). Hanya pemilik boleh lihat — Super Admin pun tidak. Untuk lihat/salin, pelajar sahkan password akaun CRM; locker terbuka 10 minit.
+- **Jangan tukar `APP_KEY` di production** selepas ada data locker — semua password tersimpan tidak akan boleh dibaca lagi.
 
-## Learning Laravel
+## Chat Assistant
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Soalan dikendalikan oleh `App\Services\Assistant\StudentAssistant`:
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- `/today`, "task hari ni", "nak buat apa harini" → task due/lewat + to-do hari ini (dari database).
+- `/tasks` → semua task belum siap.
+- Soalan lain → `KnowledgeAnswerService`: cari petikan paling relevan dari folder Drive yang aktif, kemudian Claude menjawab **hanya** berdasarkan petikan itu dan menyebut sumber.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+Telegram: pelajar buka **Chat Assistant → Link Telegram**, tekan pautan `t.me/<bot>?start=<kod>` (sekali guna). WhatsApp boleh ditambah kemudian dengan melaksanakan `App\Services\Messaging\MessagingChannel`.
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Setup local
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Seeder mencipta Super Admin dari `SUPER_ADMIN_*` (jika password kosong, satu dijana dan dipaparkan sekali). Dalam `APP_ENV=local` ia juga mencipta pelajar demo `pelajar@example.com` (password `password`) dan seorang pelajar menunggu kelulusan.
 
-## Contributing
+Ujian: `php artisan test`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Deploy ke Laravel Forge
 
-## Code of Conduct
+1. **Site** baru → repo `RJA9291/CRM-Study-Mode`, branch `main`, database MySQL.
+2. **Environment** (`.env`): set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://<domain>`, `DB_*`, `QUEUE_CONNECTION=database`, dan semua kunci di bahagian *CRM Study Mode* dalam `.env.example`.
+3. **Deploy script** (tambah selepas `composer install`):
+   ```bash
+   $FORGE_PHP artisan migrate --force
+   $FORGE_PHP artisan storage:link || true
+   $FORGE_PHP artisan optimize
+   $FORGE_PHP artisan filament:optimize
+   ```
+4. **Queue worker** (Forge → Queue): connection `database`, timeout `1200` — diperlukan untuk sync Drive dan balasan Telegram.
+5. **Scheduler** (Forge → Scheduler): `php artisan schedule:run` setiap minit — sync semua folder knowledge setiap hari jam 3 pagi.
+6. Sekali selepas deploy pertama: `php artisan db:seed --force` (cipta Super Admin).
+7. **Google Drive**: cipta service account di Google Cloud (aktifkan Drive API), muat naik kunci JSON ke `storage/app/private/google-service-account.json` di server, dan *Share* setiap folder knowledge kepada `client_email` service account itu (Viewer).
+8. **Telegram**: cipta bot dengan @BotFather, isi `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, kemudian jalankan `php artisan telegram:set-webhook` (webhook: `POST /api/telegram/webhook`).
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Jenis fail Drive yang dibaca: Google Docs/Sheets/Slides, PDF, DOCX, TXT/MD/CSV. Fail lain disenaraikan tetapi tidak diindeks.
