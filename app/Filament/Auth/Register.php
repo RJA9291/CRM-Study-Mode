@@ -4,6 +4,7 @@ namespace App\Filament\Auth;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Services\AdminBootstrap;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Auth\Http\Responses\Contracts\RegistrationResponse;
 use Filament\Auth\Pages\Register as BaseRegister;
@@ -63,9 +64,13 @@ class Register extends BaseRegister
 
         event(new Registered($user));
 
+        $isOwner = app(AdminBootstrap::class)->promoteIfOwner($user);
+
         Notification::make()
             ->title('Pendaftaran diterima')
-            ->body('Akaun anda sedang menunggu kelulusan Super Admin. Anda boleh log masuk selepas diluluskan.')
+            ->body($isOwner
+                ? 'Akaun pertama sistem ini — anda kini Super Admin. Sila log masuk.'
+                : 'Akaun anda sedang menunggu kelulusan Super Admin. Anda boleh log masuk selepas diluluskan.')
             ->success()
             ->persistent()
             ->send();

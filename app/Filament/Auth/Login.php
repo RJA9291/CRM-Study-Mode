@@ -4,6 +4,7 @@ namespace App\Filament\Auth;
 
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Services\AdminBootstrap;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +22,13 @@ class Login extends BaseLogin
 
         $user = $email !== '' ? User::where('email', $email)->first() : null;
 
-        if ($user && $user->status !== UserStatus::Approved && Hash::check($password, $user->password)) {
+        $verified = $user && Hash::check($password, $user->password);
+
+        if ($verified && $user->status !== UserStatus::Approved && app(AdminBootstrap::class)->promoteIfOwner($user)) {
+            return parent::authenticate();
+        }
+
+        if ($verified && $user->status !== UserStatus::Approved) {
             throw ValidationException::withMessages([
                 'data.email' => $user->status === UserStatus::Rejected
                     ? 'Pendaftaran anda telah ditolak. Sila hubungi admin.'

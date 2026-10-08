@@ -17,8 +17,58 @@ class RegistrationApprovalTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_first_ever_registration_becomes_the_approved_super_admin(): void
+    {
+        Filament::setCurrentPanel('app');
+
+        Livewire::test(Register::class)
+            ->fillForm([
+                'name' => 'Owner',
+                'email' => 'owner@example.com',
+                'student_id' => 'ADMIN',
+                'password' => 'secret-pass-123',
+                'passwordConfirmation' => 'secret-pass-123',
+            ])
+            ->call('register')
+            ->assertHasNoFormErrors();
+
+        $owner = User::firstWhere('email', 'owner@example.com');
+        $this->assertTrue($owner->isSuperAdmin());
+        $this->assertTrue($owner->isApproved());
+    }
+
+    public function test_earliest_pending_account_is_promoted_at_login_when_no_admin_exists(): void
+    {
+        $owner = User::factory()->pending()->create(['email' => 'admin@studymode.example']);
+        $later = User::factory()->pending()->create(['email' => 'later@example.com']);
+
+        Filament::setCurrentPanel('admin');
+
+        Livewire::test(Login::class)
+            ->fillForm(['email' => 'later@example.com', 'password' => 'password'])
+            ->call('authenticate')
+            ->assertHasFormErrors(['email']);
+        $this->assertFalse($later->fresh()->isSuperAdmin());
+
+        Livewire::test(Login::class)
+            ->fillForm(['email' => 'admin@studymode.example', 'password' => 'wrong-password'])
+            ->call('authenticate')
+            ->assertHasFormErrors(['email']);
+        $this->assertFalse($owner->fresh()->isSuperAdmin());
+
+        Livewire::test(Login::class)
+            ->fillForm(['email' => 'admin@studymode.example', 'password' => 'password'])
+            ->call('authenticate')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue($owner->fresh()->isSuperAdmin());
+        $this->assertTrue($owner->fresh()->isApproved());
+        $this->assertAuthenticatedAs($owner->fresh());
+    }
+
     public function test_registration_creates_a_pending_student_who_is_not_logged_in(): void
     {
+        User::factory()->superAdmin()->create();
         Filament::setCurrentPanel('app');
 
         Livewire::test(Register::class)
@@ -42,6 +92,7 @@ class RegistrationApprovalTest extends TestCase
 
     public function test_registration_cannot_self_assign_admin_role(): void
     {
+        User::factory()->superAdmin()->create();
         Filament::setCurrentPanel('app');
 
         Livewire::test(Register::class)
@@ -64,6 +115,7 @@ class RegistrationApprovalTest extends TestCase
     public function test_pending_student_gets_a_clear_message_at_login(): void
     {
         Filament::setCurrentPanel('app');
+        User::factory()->superAdmin()->create();
         User::factory()->pending()->create(['email' => 'p@example.com']);
 
         Livewire::test(Login::class)
