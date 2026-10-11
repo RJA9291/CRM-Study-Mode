@@ -30,45 +30,57 @@ class KnowledgeSearch
     }
 
     /**
+     * A small knowledge base is returned whole (best matches first) so the model can answer
+     * questions whose wording or language differs from the documents; larger ones are keyword-filtered.
+     *
      * @return Collection<int, KnowledgeChunk>
      */
-    public function search(string $query, int $limit = 8): Collection
+    public function search(string $query, int $limit = 8, int $wholeCorpusLimit = 0): Collection
     {
         $keywords = $this->keywords($query);
+
+        $base = fn () => KnowledgeChunk::query()
+            ->with('document.source')
+            ->whereHas('document.source', fn (Builder $q) => $q->where('is_active', true));
+
+        if ($wholeCorpusLimit > 0 && $base()->count() <= $wholeCorpusLimit) {
+            return $this->rank($base()->get(), $keywords)->values();
+        }
+
         if ($keywords === []) {
             return collect();
         }
 
-        $base = KnowledgeChunk::query()
-            ->with('document.source')
-            ->whereHas('document.source', fn (Builder $q) => $q->where('is_active', true));
-
-        if (in_array($base->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
-            $terms = implode(' ', $keywords);
-
-            return $base
-                ->whereFullText('content', $terms)
-                ->orderByRaw('MATCH(content) AGAINST (?) DESC', [$terms])
-                ->limit($limit)
-                ->get();
-        }
-
-        return $base
+        $candidates = $base()
             ->where(function (Builder $q) use ($keywords) {
                 foreach ($keywords as $word) {
-                    $q->orWhere('content', 'like', '%'.$word.'%');
+                    $q->orWhere('content', 'like', '%'.$word.'%')
+                        ->orWhereHas('document', fn (Builder $d) => $d->where('title', 'like', '%'.$word.'%'));
                 }
             })
             ->limit(500)
-            ->get()
+            ->get();
+
+        return $this->rank($candidates, $keywords)
+            ->filter(fn (KnowledgeChunk $chunk) => $chunk->getAttribute('score') > 0)
+            ->take($limit)
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, KnowledgeChunk>  $chunks
+     * @param  list<string>  $keywords
+     * @return Collection<int, KnowledgeChunk>
+     */
+    private function rank(Collection $chunks, array $keywords): Collection
+    {
+        return $chunks
             ->map(function (KnowledgeChunk $chunk) use ($keywords) {
                 $haystack = Str::lower($chunk->content.' '.$chunk->document->title);
                 $chunk->setAttribute('score', collect($keywords)->sum(fn ($w) => substr_count($haystack, $w) > 0 ? 1 + min(substr_count($haystack, $w), 5) / 10 : 0));
 
                 return $chunk;
             })
-            ->sortByDesc('score')
-            ->take($limit)
-            ->values();
+            ->sortByDesc('score');
     }
 }

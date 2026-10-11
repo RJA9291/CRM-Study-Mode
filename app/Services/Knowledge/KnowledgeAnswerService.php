@@ -32,7 +32,11 @@ class KnowledgeAnswerService
 
     public function answer(string $question): string
     {
-        $chunks = $this->search->search($question, (int) config('crm.knowledge.max_context_chunks', 8));
+        $chunks = $this->search->search(
+            $question,
+            (int) config('crm.knowledge.max_context_chunks', 8),
+            (int) config('crm.knowledge.whole_corpus_chunks', 40),
+        );
 
         if ($chunks->isEmpty()) {
             return self::NO_MATCH;

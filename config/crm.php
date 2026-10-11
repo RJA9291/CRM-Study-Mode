@@ -32,6 +32,8 @@ return [
         'chunk_size' => 1500,
         'chunk_overlap' => 200,
         'max_context_chunks' => 8,
+        // Up to this many chunks in total, every chunk is sent to the model (~60k characters).
+        'whole_corpus_chunks' => 40,
         'max_file_bytes' => 15 * 1024 * 1024,
     ],
 

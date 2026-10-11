@@ -12,6 +12,8 @@ use App\Services\Knowledge\DriveClient;
 use App\Services\Knowledge\DriveFile;
 use App\Services\Knowledge\GoogleDriveClient;
 use App\Services\Knowledge\KnowledgeAnswerService;
+use App\Services\Knowledge\KnowledgeSearch;
+use App\Services\Knowledge\KnowledgeSearch;
 use App\Services\Knowledge\TextChunker;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -128,6 +130,35 @@ class KnowledgeTest extends TestCase
         $this->assertSame('Peperiksaan Fizik pada 12 Disember. Sumber: Jadual Peperiksaan', $answer);
         $this->assertStringContainsString('12 Disember', $this->generator->lastUserMessage);
         $this->assertStringNotContainsString('1 Jun', $this->generator->lastUserMessage);
+    }
+
+    public function test_small_corpus_reaches_the_model_even_when_wording_differs(): void
+    {
+        $source = KnowledgeSource::create(['name' => 'Notes', 'drive_url' => 'FOLDERACTIVE123']);
+        $source->documents()->create(['drive_file_id' => 'a', 'title' => 'Exam Timetable'])
+            ->chunks()->create(['position' => 0, 'content' => 'Final physics exam: 12 December, Hall A.']);
+        $this->generator->reply = '12 Disember. Sumber: Exam Timetable';
+
+        $answer = app(KnowledgeAnswerService::class)->answer('Bila peperiksaan fizik?');
+
+        $this->assertSame('12 Disember. Sumber: Exam Timetable', $answer);
+        $this->assertStringContainsString('Hall A', $this->generator->lastUserMessage);
+    }
+
+    public function test_large_corpus_is_keyword_filtered_and_matches_titles(): void
+    {
+        $source = KnowledgeSource::create(['name' => 'Nota', 'drive_url' => 'FOLDERACTIVE123']);
+        $doc = $source->documents()->create(['drive_file_id' => 'a', 'title' => 'Yuran Semester']);
+        $doc->chunks()->create(['position' => 0, 'content' => 'Bayaran perlu dibuat sebelum minggu kedua.']);
+        $other = $source->documents()->create(['drive_file_id' => 'b', 'title' => 'Kokurikulum']);
+        $other->chunks()->create(['position' => 0, 'content' => 'Kelab robotik bertemu setiap Rabu.']);
+
+        $search = app(KnowledgeSearch::class);
+
+        $hits = $search->search('Berapa yuran?', 8, 1);
+        $this->assertSame(['Yuran Semester'], $hits->map(fn ($c) => $c->document->title)->all());
+        $this->assertCount(0, $search->search('jadual bas', 8, 1));
+        $this->assertCount(2, $search->search('jadual bas', 8, 40));
     }
 
     public function test_no_match_does_not_call_the_model(): void
