@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\ChatMessages\Pages\ListChatMessages;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Models\ChatMessage;
 use App\Models\Task;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class TelegramWebhookTest extends TestCase
@@ -24,7 +27,7 @@ class TelegramWebhookTest extends TestCase
             'crm.telegram.webhook_secret' => 'hook-secret',
         ]);
 
-        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
+        Http::fake(['api.telegram.org/*/sendMessage' => Http::response(['ok' => true])]);
     }
 
     private function update(string $text, int $chatId = 555): array
@@ -96,6 +99,26 @@ class TelegramWebhookTest extends TestCase
         $this->assertStringNotContainsString('Task orang lain', $reply);
 
         $this->assertSame(2, ChatMessage::where('user_id', $user->id)->count());
+    }
+
+    public function test_admin_can_register_the_webhook_from_the_panel(): void
+    {
+        Http::fake([
+            'api.telegram.org/*/setWebhook' => Http::response(['ok' => true, 'result' => true]),
+            'api.telegram.org/*/getMe' => Http::response(['ok' => true, 'result' => ['username' => 'StudyModeCRM_bot']]),
+            'api.telegram.org/*/getWebhookInfo' => Http::response(['ok' => true, 'result' => ['url' => route('telegram.webhook'), 'pending_update_count' => 0]]),
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create());
+        Filament::setCurrentPanel('admin');
+
+        Livewire::test(ListChatMessages::class)
+            ->callAction('registerTelegramWebhook')
+            ->assertNotified('Telegram bersambung');
+
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/setWebhook')
+            && $r['url'] === route('telegram.webhook')
+            && $r['secret_token'] === 'hook-secret');
     }
 
     public function test_group_chats_are_ignored(): void

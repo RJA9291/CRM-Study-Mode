@@ -43,6 +43,11 @@ class TelegramChannel implements MessagingChannel
         ])->throw()->json();
     }
 
+    public function getWebhookInfo(): array
+    {
+        return $this->request()->get('getWebhookInfo')->throw()->json('result', []);
+    }
+
     public function getMe(): array
     {
         return $this->request()->get('getMe')->throw()->json('result', []);
