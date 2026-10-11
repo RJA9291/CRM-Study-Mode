@@ -21,6 +21,9 @@ Soalan dikendalikan oleh `App\Services\Assistant\StudentAssistant`:
 
 - `/today`, "task hari ni", "nak buat apa harini" → task due/lewat + to-do hari ini (dari database).
 - `/tasks` → semua task belum siap.
+- `/task Tajuk | 15/10 | Subjek` → tambah task (tarikh: `15/10`, `15/10/2026`, `2026-10-15`, `esok`, `lusa`; tarikh & subjek pilihan).
+- `/todo Perkara` → tambah to-do hari ini.
+- `/done 2` → tanda siap item no. 2 dari senarai `/today`.
 - Soalan lain → `KnowledgeAnswerService`: cari petikan paling relevan dari folder Drive yang aktif, kemudian Claude menjawab **hanya** berdasarkan petikan itu dan menyebut sumber.
 
 Telegram: pelajar buka **Chat Assistant → Link Telegram**, tekan pautan `t.me/<bot>?start=<kod>` (sekali guna). WhatsApp boleh ditambah kemudian dengan melaksanakan `App\Services\Messaging\MessagingChannel`.
