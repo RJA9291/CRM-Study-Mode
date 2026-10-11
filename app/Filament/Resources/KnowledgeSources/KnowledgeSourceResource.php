@@ -5,6 +5,7 @@ namespace App\Filament\Resources\KnowledgeSources;
 use App\Filament\Resources\KnowledgeSources\Pages\ManageKnowledgeSources;
 use App\Jobs\SyncKnowledgeSource;
 use App\Models\KnowledgeSource;
+use App\Services\Knowledge\GoogleDriveClient;
 use BackedEnum;
 use Closure;
 use Filament\Actions\Action;
@@ -36,14 +37,12 @@ class KnowledgeSourceResource extends Resource
 
     public static function serviceAccountEmail(): ?string
     {
-        $path = (string) config('crm.google.service_account_json');
-        $path = is_file($path) ? $path : base_path($path);
+        $credentials = GoogleDriveClient::credentials(
+            config('crm.google.service_account_base64'),
+            config('crm.google.service_account_json'),
+        );
 
-        if (! is_file($path)) {
-            return null;
-        }
-
-        return json_decode((string) file_get_contents($path), true)['client_email'] ?? null;
+        return $credentials['client_email'] ?? null;
     }
 
     public static function form(Schema $schema): Schema

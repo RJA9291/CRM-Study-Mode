@@ -53,7 +53,7 @@ Ujian: `php artisan test`
 4. **Queue worker** (Forge → Queue): connection `database`, timeout `1200` — diperlukan untuk sync Drive dan balasan Telegram.
 5. **Scheduler** (Forge → Scheduler): `php artisan schedule:run` setiap minit — sync semua folder knowledge setiap hari jam 3 pagi.
 6. Super Admin pertama: selagi tiada Super Admin, akaun **paling awal didaftar** terus menjadi Super Admin yang diluluskan (semasa daftar atau log masuk). Untuk melantik admin lain kemudian: `php artisan crm:make-admin <email>` (Forge → Commands).
-7. **Google Drive**: cipta service account di Google Cloud (aktifkan Drive API), muat naik kunci JSON ke `storage/app/private/google-service-account.json` di server, dan *Share* setiap folder knowledge kepada `client_email` service account itu (Viewer).
+7. **Google Drive**: cipta service account di Google Cloud (aktifkan Drive API), tukar kunci JSON kepada base64 dan isi `GOOGLE_SERVICE_ACCOUNT_BASE64` dalam Environment (atau muat naik fail ke `storage/app/private/google-service-account.json`), dan *Share* setiap folder knowledge kepada `client_email` service account itu (Viewer).
 8. **Telegram**: cipta bot dengan @BotFather, isi `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, kemudian jalankan `php artisan telegram:set-webhook` (webhook: `POST /api/telegram/webhook`).
 
 Jenis fail Drive yang dibaca: Google Docs/Sheets/Slides, PDF, DOCX, TXT/MD/CSV. Fail lain disenaraikan tetapi tidak diindeks.

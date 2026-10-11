@@ -30,7 +30,33 @@ class GoogleDriveClient implements DriveClient
     public function __construct(
         private readonly string $credentialsPath,
         private readonly int $maxFileBytes,
+        private readonly ?string $credentialsBase64 = null,
     ) {}
+
+    /**
+     * Service-account key from a base64 env value (preferred on Forge) or a JSON file path.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function credentials(?string $base64, ?string $path): ?array
+    {
+        if (filled($base64)) {
+            $decoded = json_decode((string) base64_decode(preg_replace('/\s+/', '', $base64), true), true);
+
+            return is_array($decoded) ? $decoded : null;
+        }
+
+        if (blank($path)) {
+            return null;
+        }
+        if (! str_starts_with($path, '/') && ! preg_match('~^[A-Za-z]:[\\\\/]~', $path)) {
+            $path = base_path($path);
+        }
+
+        $decoded = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+
+        return is_array($decoded) ? $decoded : null;
+    }
 
     public function listFiles(string $folderId): iterable
     {
@@ -130,16 +156,13 @@ class GoogleDriveClient implements DriveClient
             return $this->drive;
         }
 
-        $path = $this->credentialsPath;
-        if (! str_starts_with($path, '/') && ! preg_match('~^[A-Za-z]:[\\\\/]~', $path)) {
-            $path = base_path($path);
-        }
-        if (! is_file($path)) {
-            throw new RuntimeException("Google service account key not found at [{$this->credentialsPath}].");
+        $credentials = static::credentials($this->credentialsBase64, $this->credentialsPath);
+        if ($credentials === null) {
+            throw new RuntimeException('Google service account key not configured (GOOGLE_SERVICE_ACCOUNT_BASE64 or GOOGLE_SERVICE_ACCOUNT_JSON).');
         }
 
         $client = new GoogleClient;
-        $client->setAuthConfig($path);
+        $client->setAuthConfig($credentials);
         $client->setScopes([Drive::DRIVE_READONLY]);
 
         return $this->drive = new Drive($client);

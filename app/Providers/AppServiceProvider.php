@@ -24,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(DriveClient::class, fn () => new GoogleDriveClient(
             credentialsPath: config('crm.google.service_account_json'),
             maxFileBytes: config('crm.knowledge.max_file_bytes'),
+            credentialsBase64: config('crm.google.service_account_base64'),
         ));
 
         $this->app->bind(TextChunker::class, fn () => new TextChunker(

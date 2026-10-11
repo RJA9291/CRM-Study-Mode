@@ -22,6 +22,8 @@ return [
     ],
 
     'google' => [
+        // Base64 of the service-account JSON key; takes precedence over the file path below.
+        'service_account_base64' => env('GOOGLE_SERVICE_ACCOUNT_BASE64'),
         // Path to the service-account JSON key, relative to the project root or absolute.
         'service_account_json' => env('GOOGLE_SERVICE_ACCOUNT_JSON', 'storage/app/private/google-service-account.json'),
     ],

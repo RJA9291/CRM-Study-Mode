@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\KnowledgeSources\KnowledgeSourceResource;
 use App\Jobs\SyncKnowledgeSource;
 use App\Models\KnowledgeDocument;
 use App\Models\KnowledgeSource;
@@ -9,6 +10,7 @@ use App\Services\Ai\AnswerGenerationException;
 use App\Services\Ai\AnswerGenerator;
 use App\Services\Knowledge\DriveClient;
 use App\Services\Knowledge\DriveFile;
+use App\Services\Knowledge\GoogleDriveClient;
 use App\Services\Knowledge\KnowledgeAnswerService;
 use App\Services\Knowledge\TextChunker;
 use Carbon\CarbonImmutable;
@@ -41,6 +43,19 @@ class KnowledgeTest extends TestCase
         $this->assertSame('1AbC_dEf-123', KnowledgeSource::extractFolderId('https://drive.google.com/drive/folders/1AbC_dEf-123?usp=sharing'));
         $this->assertSame('1AbC_dEf-123', KnowledgeSource::extractFolderId('https://drive.google.com/open?id=1AbC_dEf-123'));
         $this->assertNull(KnowledgeSource::extractFolderId('https://example.com/nope'));
+    }
+
+    public function test_service_account_key_loads_from_base64_env_and_admin_sees_its_email(): void
+    {
+        $key = ['type' => 'service_account', 'client_email' => 'crm-bot@proj.iam.gserviceaccount.com'];
+        $b64 = chunk_split(base64_encode(json_encode($key)), 20);
+
+        $this->assertSame($key, GoogleDriveClient::credentials($b64, null));
+        $this->assertNull(GoogleDriveClient::credentials('not-base64!!', null));
+        $this->assertNull(GoogleDriveClient::credentials(null, 'storage/app/private/missing.json'));
+
+        config(['crm.google.service_account_base64' => $b64]);
+        $this->assertSame('crm-bot@proj.iam.gserviceaccount.com', KnowledgeSourceResource::serviceAccountEmail());
     }
 
     public function test_chunker_splits_long_text_with_bounded_chunk_size(): void
