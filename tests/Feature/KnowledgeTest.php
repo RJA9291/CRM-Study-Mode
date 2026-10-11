@@ -13,7 +13,6 @@ use App\Services\Knowledge\DriveFile;
 use App\Services\Knowledge\GoogleDriveClient;
 use App\Services\Knowledge\KnowledgeAnswerService;
 use App\Services\Knowledge\KnowledgeSearch;
-use App\Services\Knowledge\KnowledgeSearch;
 use App\Services\Knowledge\TextChunker;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
